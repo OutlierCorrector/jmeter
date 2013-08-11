@@ -28,16 +28,15 @@
 /////////////////////////////////////////
 
 package org.apache.jmeter.threads;
-
 import java.util.List;
+import org.OutlierCorrector.*;
 
+import org.apache.jmeter.samplers.ListenerOutputHandler;
 //import org.apache.commons.collections.Buffer;
 //import org.apache.commons.collections.BufferUtils;
 //import org.apache.commons.collections.buffer.UnboundedFifoBuffer;
 import org.apache.jmeter.samplers.SampleEvent;
 import org.apache.jmeter.samplers.SampleListener;
-import org.apache.jmeter.testbeans.TestBeanHelper;
-import org.apache.jmeter.testelement.TestElement;
 import org.apache.jorphan.logging.LoggingManager;
 import org.apache.log.Logger;
 
@@ -64,8 +63,22 @@ import org.apache.log.Logger;
  */
 public class ListenerNotifier {
     private static final Logger log = LoggingManager.getLoggerForClass();
+    
+    private final ListenerOutputHandler listenerOutputter = new ListenerOutputHandler(log,
+    		ListenerOutputHandler.OutputLabelMode.COMPENSATE_AS_DUPLICATE_LABEL);
+	private final RequestStreamSorter sortingOutputter = new RequestStreamSorter(listenerOutputter); 
+    private final RequestHandler handler = new ThreadHandler(sortingOutputter, 100 /* window size*/, 10 /* before compensation */,
+			20 /* number of requests to detect pattern */, 10 /* max offset before pattern */,
+			3 /* min pattern repeat */);
+    
+//    private static final ThreadLocal<WindowHandler> threadLocalWindow = 
+//    		new ThreadLocal<WindowHandler>();
+//    private static final ThreadLocal<ListenerOutputHandler> threadLocalOutputter = 
+//    		new ThreadLocal<ListenerOutputHandler>();
 
-
+    // NEED TO CREATE OUTPUTTER AND WINDOW HANDLER HERE
+    // implies we need the listeners list as a parameter for the constructor
+    
     /**
      * Notify a list of listeners that a sample has occurred.
      *
@@ -76,17 +89,28 @@ public class ListenerNotifier {
      *            must not be null and must contain only SampleListener
      *            elements.
      */
-    @SuppressWarnings("deprecation") // TestBeanHelper.prepare() is OK
-    public void notifyListeners(SampleEvent res, List<SampleListener> listeners) {
-        for (SampleListener sampleListener : listeners) {
-            try {
-                TestBeanHelper.prepare((TestElement) sampleListener);
-                sampleListener.sampleOccurred(res);
-            } catch (RuntimeException e) {
-                log.error("Detected problem in Listener: ", e);
-                log.info("Continuing to process further listeners");
-            }
-        }
+    public void notifyListeners(SampleEvent res, List<SampleListener> listeners) {   	
+//    	ListenerOutputHandler outputter = threadLocalOutputter.get();
+//    	if (outputter == null) {
+//    		outputter = new ListenerOutputHandler(log, 
+//    	    		ListenerOutputHandler.OutputLabelMode.COMPENSATE_AS_DUPLICATE_LABEL);
+//    		threadLocalOutputter.set(outputter);
+//    	}
+//    	
+//    	WindowHandler window = threadLocalWindow.get();
+//    	if (window == null) {
+//    		window = new WindowHandler(outputter, 100 /* window size*/, 5 /* before compensation */,
+//    				20 /* number of requests to detect pattern */, 10 /* max offset before pattern */,
+//    				5 /* min pattern repeat */);
+////    		window = new WindowHandler(outputter);
+//    		threadLocalWindow.set(window);
+//    	}
+
+    	listenerOutputter.setListeners(listeners);
+    	listenerOutputter.setOriginalEvent(res);
+    	
+    	handler.handleRequest(new Request(res.getResult().getStartTime(), (double) res.getResult().getTime(),
+    			res.getResult().getThreadName(), res.getResult().getSampleLabel(), true /* original request */));
     }
 
 //    /**
